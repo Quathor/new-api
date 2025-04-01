@@ -233,15 +233,14 @@ func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interfac
 	if depth >= 5 {
 		return schema
 	}
-
 	v, ok := schema.(map[string]interface{})
-	if !ok || len(v) == 0 {
+	if !ok {
 		return schema
 	}
 	// 删除所有的title字段
 	delete(v, "title")
 	// 如果type不为object和array，则直接返回
-	if typeVal, exists := v["type"]; !exists || (typeVal != "object" && typeVal != "array") {
+	if typeVal, exists := v["type"]; exists && typeVal != "object" && typeVal != "array" {
 		return schema
 	}
 	switch v["type"] {
@@ -265,7 +264,6 @@ func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interfac
 			v["items"] = removeAdditionalPropertiesWithDepth(items, depth+1)
 		}
 	}
-
 	return v
 }
 
