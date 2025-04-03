@@ -61,8 +61,12 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 					if props, hasProps := params["properties"].(map[string]interface{}); hasProps {
 						if len(props) == 0 {
 							tool.Function.Parameters = nil
+							continue
 						}
 					}
+				}
+				if tool.Function.Parameters != nil {
+					tool.Function.Parameters = removeAdditionalPropertiesWithDepth(tool.Function.Parameters, 0)
 				}
 			}
 			functions = append(functions, tool.Function)
@@ -87,6 +91,7 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 		// common.SysLog("tools_json: " + string(json_data))
 	} else if textRequest.Functions != nil {
 		geminiRequest.Tools = []GeminiChatTool{
+			
 			{
 				FunctionDeclarations: textRequest.Functions,
 			},
