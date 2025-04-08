@@ -61,12 +61,11 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 					if props, hasProps := params["properties"].(map[string]interface{}); hasProps {
 						if len(props) == 0 {
 							tool.Function.Parameters = nil
-							continue
+						} else {
+							// 清理所有default字段
+							tool.Function.Parameters = cleanFunctionParameters(params)
 						}
 					}
-				}
-				if tool.Function.Parameters != nil {
-					tool.Function.Parameters = removeAdditionalPropertiesWithDepth(tool.Function.Parameters, 0)
 				}
 			}
 			functions = append(functions, tool.Function)
@@ -91,7 +90,6 @@ func CovertGemini2OpenAI(textRequest dto.GeneralOpenAIRequest) (*GeminiChatReque
 		// common.SysLog("tools_json: " + string(json_data))
 	} else if textRequest.Functions != nil {
 		geminiRequest.Tools = []GeminiChatTool{
-			
 			{
 				FunctionDeclarations: textRequest.Functions,
 			},
@@ -238,14 +236,15 @@ func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interfac
 	if depth >= 5 {
 		return schema
 	}
+
 	v, ok := schema.(map[string]interface{})
-	if !ok {
+	if !ok || len(v) == 0 {
 		return schema
 	}
 	// 删除所有的title字段
 	delete(v, "title")
 	// 如果type不为object和array，则直接返回
-	if typeVal, exists := v["type"]; exists && typeVal != "object" && typeVal != "array" {
+	if typeVal, exists := v["type"]; !exists || (typeVal != "object" && typeVal != "array") {
 		return schema
 	}
 	switch v["type"] {
@@ -269,6 +268,7 @@ func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interfac
 			v["items"] = removeAdditionalPropertiesWithDepth(items, depth+1)
 		}
 	}
+
 	return v
 }
 
@@ -631,4 +631,46 @@ func GeminiEmbeddingHandler(c *gin.Context, resp *http.Response, info *relaycomm
 	_, _ = c.Writer.Write(jsonResponse)
 
 	return usage, nil
+}
+
+// 添加一个递归函数来清除参数中的default字段
+func cleanFunctionParameters(params interface{}) interface{} {
+    if params == nil {
+        return nil
+    }
+    
+    switch v := params.(type) {
+    case map[string]interface{}:
+        // 删除default字段
+        delete(v, "default")
+        
+        // 处理properties字段
+        if props, ok := v["properties"].(map[string]interface{}); ok {
+            for key, val := range props {
+                props[key] = cleanFunctionParameters(val)
+            }
+        }
+        
+        // 处理items字段(用于数组)
+        if items, ok := v["items"].(map[string]interface{}); ok {
+            v["items"] = cleanFunctionParameters(items)
+        }
+        
+        // 递归处理嵌套结构
+        for _, field := range []string{"allOf", "anyOf", "oneOf"} {
+            if nested, ok := v[field].([]interface{}); ok {
+                for i, item := range nested {
+                    nested[i] = cleanFunctionParameters(item)
+                }
+            }
+        }
+        return v
+    case []interface{}:
+        for i, item := range v {
+            v[i] = cleanFunctionParameters(item)
+        }
+        return v
+    default:
+        return params
+    }
 }
