@@ -643,7 +643,17 @@ func cleanFunctionParameters(params interface{}) interface{} {
     case map[string]interface{}:
         // 删除default字段
         delete(v, "default")
-        
+		delete(v, "additionalProperties")
+        delete(v, "exclusiveMaximum")
+        delete(v, "exclusiveMinimum")
+
+        // 处理format字段，Gemini只支持enum和date-time
+        if format, exists := v["format"].(string); exists {
+            if format != "enum" && format != "date-time" {
+                delete(v, "format")  // 删除不支持的format
+            }
+        }
+
         // 处理properties字段
         if props, ok := v["properties"].(map[string]interface{}); ok {
             for key, val := range props {
